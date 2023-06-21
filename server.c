@@ -4,8 +4,8 @@
 #include <pthread.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include "header.h"
 #include <unistd.h>
+#include "server_functions.c"
 
 #define MAX_CLIENTS 10
 #define BUFFER_SIZE 1024
@@ -30,22 +30,44 @@ void *clientHandler(void *arg)
     switch (request.choice)
     {
     case 1:
-        Hotel *found_hotel;
-        found_hotel = searchHotelByLocation(hotels, request.query);
+        Hotel **found_hotels;
+        int found_hotel_count;
+        found_hotels = searchHotelByLocation(hotels, request.query);
+        saveHotelData(found_hotels, getsize(found_hotels));
 
-        // Convert the found hotel to JSON
-        char *json_hotel= hotelToJson(found_hotel);
-
-        ssize_t bytesSent = send(clientSocket, json_hotel, sizeof(Hotel), 0);
-
-        if (bytesSent < 0)
+        FILE *file = fopen("sendHotels.csv", "rb");
+        if (file == NULL)
         {
-            perror("Error sending search results");
+            perror("Failed to open the file");
             close(clientSocket);
             return NULL;
         }
-        break;
-        printHotelData(found_hotel);
+
+        fseek(file, 0, SEEK_END);
+        long file_size = ftell(file);
+        fseek(file, 0, SEEK_SET);
+        char *buffer = (char *)malloc(file_size);
+        fread(buffer, file_size, 1, file);
+        fclose(file);
+
+        int bytes_sent = send(clientSocket, &file_size, sizeof(long), 0);
+        if (bytes_sent == -1)
+        {
+            perror("Failed to send file size");
+            close(clientSocket);
+            return NULL;
+        }
+
+        bytes_sent = send(clientSocket, buffer, file_size, 0);
+        if (bytes_sent == -1)
+        {
+            perror("Failed to send file");
+            close(clientSocket);
+            return NULL;
+        }
+
+        free(buffer);
+        // printHotelData(found_hotels);
         break;
     case 2:
         // Handle case 2: perform action for choice 2
@@ -64,11 +86,11 @@ void *clientHandler(void *arg)
     return NULL;
 }
 
-int main(int argc, char ** argv)
+int main(int argc, char **argv)
 {
     // Get the hotel data from the function
-    hotels = getHotelData();
-
+    hotels = getHotelData("hotels.csv");
+    printf("Size of array:%d",getsize(hotels));
     int serverSocket, clientSocket;
     struct sockaddr_in serverAddr, clientAddr;
     pthread_t threadId;
@@ -84,7 +106,7 @@ int main(int argc, char ** argv)
     // Set server address structure
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = INADDR_ANY;
-    serverAddr.sin_port = htons(8080); // You can choose a different port number if needed
+    serverAddr.sin_port = htons(8040); // You can choose a different port number if needed
 
     // Bind server socket to the specified address and port
     if (bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)

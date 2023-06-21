@@ -6,10 +6,19 @@
 #define MAX_ROOMS 100
 #define MAX_BOOKED_DATES 100
 
-Hotel **getHotelData()
+void remove_newline_character(char *string)
+{
+    int length = strlen(string);
+    if (length > 0 && string[length - 1] == '\n')
+    {
+        string[length - 1] = '\0';
+    }
+}
+
+Hotel **getHotelData(char *filename)
 {
     // Open the file for reading
-    FILE *file = fopen("hotels.csv", "r");
+    FILE *file = fopen(filename, "r");
     if (file == NULL)
     {
         printf("Failed to open the file.\n");
@@ -51,11 +60,8 @@ Hotel **getHotelData()
             token = strtok(NULL, "#");
             room->number = atof(token);
 
-            for (int i = 0; i < 4; i++)
-            {
-                token = strtok(NULL, "#");
-                room->price[i] = atof(token);
-            }
+            token = strtok(NULL, "#");
+            room->price = atof(token);
 
             token = strtok(NULL, ",");
             room->booked_dates_count = 0;
@@ -78,6 +84,7 @@ Hotel **getHotelData()
                 token = strtok(NULL, ",#");
             }
 
+            remove_newline_character(token);
             room->description = strdup(token);
 
             // Add the room to the hotel
@@ -103,7 +110,7 @@ Hotel **getHotelData()
 
     // Close the file
     fclose(file);
-
+    hotels[hotel_count] = NULL;
     return hotels;
 }
 
@@ -120,15 +127,11 @@ int getsize(Hotel **hotels)
     return length;
 }
 
-
 void printRoomData(Room *room)
 {
     printf("Room Type: %d bed\n", room->beds);
     printf("Room Number: %d\n", room->number);
-    printf("Price (Spring): %.2lf\n", room->price[0]);
-    printf("Price (Autumn): %.2lf\n", room->price[1]);
-    printf("Price (Winter): %.2lf\n", room->price[2]);
-    printf("Price (Summer): %.2lf\n", room->price[3]);
+    printf("Price : %d\n", room->price);
     printf("Booked Dates: ");
     for (int k = 0; k < room->booked_dates_count; k++)
     {
@@ -144,30 +147,38 @@ void printRoomData(Room *room)
 void printHotelData(Hotel *hotel)
 {
 
-    printf("Hotel Name: %s\n", hotel->name);
+    printf("\nHotel Name: %s\n", hotel->name);
     printf("Location: %s\n", hotel->location);
     printf("Description: %s\n", hotel->description);
 
+    printf("These rooms are available\n");
     for (int j = 0; j < hotel->room_count; j++)
     {
+        printf("%d)", j + 1);
         Room *room = hotel->rooms[j];
         printRoomData(room);
     }
-
     printf("=========================================\n");
 }
 
-Hotel *searchHotelByLocation(Hotel **hotels, const char *search_location)
+Hotel **searchHotelByLocation(Hotel **hotels, const char *search_location)
 {
-    
+    // Create a dynamic array to store the found hotels
+    Hotel **found_hotels = NULL;
+    int count = 0;
+
     for (int i = 0; i < getsize(hotels); i++)
     {
         if (strcasecmp(hotels[i]->location, search_location) == 0)
         {
-            return hotels[i];
+            // Reallocate memory for the dynamic array to accommodate the new hotel
+            found_hotels = realloc(found_hotels, (count + 1) * sizeof(Hotel *));
+            found_hotels[count] = hotels[i];
+            count++;
         }
     }
-    return NULL;
+
+    return found_hotels;
 }
 
 Room *searchRoomByBedNumber(Hotel *hotels, int hotel_count, int search_bed_number)
@@ -187,63 +198,60 @@ Room *searchRoomByBedNumber(Hotel *hotels, int hotel_count, int search_bed_numbe
     return NULL; // If no matching room is found
 }
 
-char* hotelToJson(const Hotel* hotel) {
-    json_object *jhotel = json_object_new_object();
-    json_object_object_add(jhotel, "name", json_object_new_string(hotel->name));
-    json_object_object_add(jhotel, "location", json_object_new_string(hotel->location));
-
-    json_object *jrooms = json_object_new_array();
-    for (int i = 0; i < hotel->room_count; i++) {
-        Room *room = hotel->rooms[i];
-        json_object *jroom = json_object_new_object();
-        json_object_object_add(jroom, "price", json_object_new_double(room->price[0]));
-        // Add more room fields as needed
-        json_object_array_add(jrooms, jroom);
-    }
-    json_object_object_add(jhotel, "rooms", jrooms);
-
-    const char *json_str = json_object_to_json_string(jhotel);
-
-    char *result = strdup(json_str); // Allocate memory for the result
-
-    json_object_put(jhotel); // Release the JSON object and its contents
-
-    return result;
-}
-
-Hotel* jsonToHotel(const char* json_str) {
-    json_object *jhotel = json_tokener_parse(json_str);
-
-    json_object *jname, *jlocation, *jrooms;
-    if (!json_object_object_get_ex(jhotel, "name", &jname) ||
-        !json_object_object_get_ex(jhotel, "location", &jlocation) ||
-        !json_object_object_get_ex(jhotel, "rooms", &jrooms) ||
-        !json_object_is_type(jrooms, json_type_array)) {
-        // Invalid JSON format, handle the error
-        json_object_put(jhotel);
-        return NULL;
+void saveHotelData(Hotel **hotels, int hotel_count)
+{
+    // Open the file for writing in overwrite mode ("w+")
+    FILE *file = fopen("sendHotels.csv", "w+");
+    if (file == NULL)
+    {
+        printf("Failed to open the file for writing.\n");
+        return;
     }
 
-    Hotel* hotel = malloc(sizeof(Hotel));
-    hotel->name = strdup(json_object_get_string(jname));
-    hotel->location = strdup(json_object_get_string(jlocation));
+    // Write the hotel data to the file
+    for (int i = 0; i < hotel_count; i++)
+    {
+        const Hotel *hotel = hotels[i];
 
-    int room_count = json_object_array_length(jrooms);
-    hotel->room_count = room_count;
-    hotel->rooms = malloc(room_count * sizeof(Room*));
+        // Write hotel information
+        fprintf(file, "%s#%s#%s#", hotel->name, hotel->location, hotel->description);
 
-    for (int i = 0; i < room_count; i++) {
-        json_object *jroom = json_object_array_get_idx(jrooms, i);
+        // Write room information for the hotel
+        for (int j = 0; j < hotel->room_count; j++)
+        {
+            const Room *room = hotel->rooms[j];
 
-        Room *room = malloc(sizeof(Room));
-        room->price[0] = json_object_get_double(json_object_object_get(jroom, "price"));
-        // Extract more room fields as needed
-        // Remember to handle memory allocation and error checking
+            // Write room details
+            fprintf(file, "%d#%d", room->beds, room->number);
 
-        hotel->rooms[i] = room;
+            fprintf(file, "#%d#", room->price);
+
+            // Write booked dates
+            for (int k = 0; k < room->booked_dates_count; k++)
+            {
+                fprintf(file, "%s", room->booked_dates[k]);
+                if (k < room->booked_dates_count - 1)
+                {
+                    fprintf(file, ",");
+                }
+            }
+            fprintf(file, "#");
+
+            // Write room description
+            if (j + 1 == hotel->room_count)
+            {
+                fprintf(file, "%s", room->description);
+            }
+            else
+            {
+                fprintf(file, "%s#", room->description);
+            }
+        }
+        fprintf(file, "\n");
     }
 
-    json_object_put(jhotel);
+    // Close the file
+    fclose(file);
 
-    return hotel;
+    printf("Hotel data saved successfully.\n");
 }

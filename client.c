@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include "server_functions.c"
 
-int main(int argc, char ** argv)
+int main(int argc, char **argv)
 {
     int clientSocket;
     struct sockaddr_in serverAddr;
@@ -22,7 +22,7 @@ int main(int argc, char ** argv)
 
     // Set server address structure
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(8080); // Same port number used by the server
+    serverAddr.sin_port = htons(8040); // Same port number used by the server
     if (inet_pton(AF_INET, "127.0.0.1", &(serverAddr.sin_addr)) <= 0)
     {
         perror("Invalid address/Address not supported");
@@ -37,62 +37,91 @@ int main(int argc, char ** argv)
     }
 
     int choice;
+    int menu = 1;
 
-    // Display the menu and get user's choice
-    printf("What do you want to search based on?\n");
-    printf("1) Location\n");
-    printf("Enter your choice: ");
-    scanf("%d", &choice);
-    getchar(); // Clear the newline character from the input buffer
-
-    if (choice == 1)
+    while (menu)
     {
-        // Prompt the user to enter the location query
-        printf("Enter the location: ");
-        fgets(buffer, BUFFER_SIZE, stdin);
-        buffer[strcspn(buffer, "\n")] = '\0';
+        /* code */
 
-        // Create the search request
-        SearchRequest request;
-        request.choice = choice;
-        strcpy(request.query, buffer);
+        // Display the menu and get user's choice
+        printf("What do you want to search based on?\n");
+        printf("1) Location\n");
+        printf("Enter your choice: ");
+        scanf("%d", &choice);
+        getchar(); // Clear the newline character from the input buffer
 
-        // Send the search request to the server
-        if (send(clientSocket, &request, sizeof(SearchRequest), 0) < 0)
+        if (choice == 1)
         {
-            perror("Error sending search request");
-            exit(EXIT_FAILURE);
-        }
+            // Prompt the user to enter the location query
+            printf("Enter the location: ");
+            fgets(buffer, BUFFER_SIZE, stdin);
+            buffer[strcspn(buffer, "\n")] = '\0';
 
-        char buffer[1024];
+            // Create the search request
+            SearchRequest request;
+            request.choice = choice;
+            strcpy(request.query, buffer);
 
-        ssize_t bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
+            // Send the search request to the server
+            if (send(clientSocket, &request, sizeof(SearchRequest), 0) < 0)
+            {
+                perror("Error sending search request");
+                exit(EXIT_FAILURE);
+            }
+            long file_size;
+            ssize_t bytesReceived = recv(clientSocket, &file_size, sizeof(long), 0);
+            if (bytesReceived < 0)
+            {
+                perror("Error receiving file size");
+                exit(EXIT_FAILURE);
+            }
 
-        // Parse the received JSON string into a Hotel struct
-        Hotel *found_hotel = jsonToHotel(buffer);
+            FILE *file = fopen("received_hotels.csv", "wb");
+            if (file == NULL)
+            {
+                perror("Failed to open the file for writing");
+                exit(EXIT_FAILURE);
+            }
 
-        if (bytesRead < 0)
-        {
-            perror("Error receiving search results");
-            exit(EXIT_FAILURE);
-        }
-        else if (bytesRead == 0)
-        {
-            printf("No search results received.\n");
+            char buffer[1024];
+            long bytesRemaining = file_size;
+            while (bytesRemaining > 0)
+            {
+                ssize_t bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
+                if (bytesRead < 0)
+                {
+                    perror("Error receiving file");
+                    fclose(file);
+                    exit(EXIT_FAILURE);
+                }
+
+                size_t bytesWritten = fwrite(buffer, sizeof(char), bytesRead, file);
+                if (bytesWritten < bytesRead)
+                {
+                    perror("Error writing to the file");
+                    fclose(file);
+                    exit(EXIT_FAILURE);
+                }
+
+                bytesRemaining -= bytesRead;
+            }
+
+            fclose(file);
+
+            Hotel **hotels_c;
+            hotels_c = getHotelData("received_hotels.csv");
+            for (int i = 0; i < getsize(hotels_c); i++)
+            {
+                printHotelData(hotels_c[i]);
+            }
+
+            return 0;
         }
         else
         {
-            printHotelData(found_hotel);
+            printf("Invalid choice\n");
         }
-
-        // Close the client socket
-        close(clientSocket);
-
-        return 0;
     }
-    else
-    {
-        printf("Invalid choice\n");
-        exit(EXIT_FAILURE);
-    }
+    // Close the client socket
+    close(clientSocket);
 }
