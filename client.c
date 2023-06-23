@@ -11,11 +11,11 @@ void doRequest(int choice, int clientSocket)
     char buffer[BUFFER_SIZE];
 
     // Prompt the user to enter the location query
+    printf("Location example:'athens'\nBed Number example:'2'\nPrice Number example:'150-250'\n");
     printf("Enter search query: ");
     fgets(buffer, BUFFER_SIZE, stdin);
     buffer[strcspn(buffer, "\n")] = '\0';
 
-    
     // Create the search request
     SearchRequest request;
     request.choice = choice;
@@ -28,33 +28,63 @@ void doRequest(int choice, int clientSocket)
         exit(EXIT_FAILURE);
     }
 
-    // Create a buffer to receive the string
-    char rbuffer[2048];
-
-    // Receive the size of the string
-    long str_size;
-    int bytes_received = recv(clientSocket, &str_size, sizeof(long), 0);
+    // Receive the number of strings
+    long str_count;
+    int bytes_received = recv(clientSocket, &str_count, sizeof(long), 0);
     if (bytes_received == -1)
     {
-        perror("Failed to receive string size");
+        perror("Failed to receive string count");
         close(clientSocket);
-        return ;
+        return;
     }
 
-    // Receive the string itself
-    bytes_received = recv(clientSocket, rbuffer, str_size, 0);
-    if (bytes_received == -1)
+    // Create an array of strings to store the received strings
+    char **receivedStrings = malloc(str_count * sizeof(char *));
+
+    // Receive each string in the array
+    for (int i = 0; i < str_count; i++)
     {
-        perror("Failed to receive string");
-        close(clientSocket);
-        return ;
+        // Receive the size of the current string
+        long str_size;
+        bytes_received = recv(clientSocket, &str_size, sizeof(long), 0);
+        if (bytes_received == -1)
+        {
+            perror("Failed to receive string size");
+            close(clientSocket);
+            return;
+        }
+
+        // Create a buffer to receive the string
+        char *rbuffer = malloc(str_size);
+
+        // Receive the string itself
+        bytes_received = recv(clientSocket, rbuffer, str_size, 0);
+        if (bytes_received == -1)
+        {
+            perror("Failed to receive string");
+            close(clientSocket);
+            return;
+        }
+
+        // Null-terminate the received string
+        rbuffer[str_size - 1] = '\0';
+
+        // Store the received string in the array
+        receivedStrings[i] = rbuffer;
     }
 
-    // Null-terminate the received string
-    rbuffer[str_size - 1] = '\0';
+    // Print the received strings
+    for (int i = 0; i < str_count; i++)
+    {
+        printf("%s\n",receivedStrings[i]);
+    }
 
-    // Print the received string
-    printf("Received string: %s\n", rbuffer);
+    // Free the memory allocated for the received strings
+    for (int i = 0; i < str_count; i++)
+    {
+        free(receivedStrings[i]);
+    }
+    free(receivedStrings);
 }
 
 int main(int argc, char **argv)
@@ -72,7 +102,7 @@ int main(int argc, char **argv)
 
     // Set server address structure
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(8040); // Same port number used by the server
+    serverAddr.sin_port = htons(8090); // Same port number used by the server
     if (inet_pton(AF_INET, "127.0.0.1", &(serverAddr.sin_addr)) <= 0)
     {
         perror("Invalid address/Address not supported");
@@ -95,19 +125,29 @@ int main(int argc, char **argv)
 
         // Display the menu and get user's choice
         printf("What do you want to search based on?\n");
-        printf("1) Location\n2)Number of Beds\n3)Price Range");
+        printf("1) Location\n2)Number of Beds\n3)Price Range\n4)Exit");
         printf("\nEnter your choice: ");
         scanf("%d", &choice);
         getchar(); // Clear the newline character from the input buffer
 
         if (choice == 1)
         {
-            doRequest(choice,clientSocket);
+            doRequest(choice, clientSocket);
         }
 
         else if (choice == 2)
         {
+            doRequest(choice, clientSocket);
+        }
+        else if (choice == 3)
+        {
             doRequest(choice,clientSocket);
+        }
+        
+        else if (choice == 4)
+        {
+            menu = 0;
+            break;
         }
         
         else
