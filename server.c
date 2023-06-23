@@ -31,46 +31,47 @@ void *clientHandler(void *arg)
     {
     case 1:
         Hotel **found_hotels;
-        int found_hotel_count;
         found_hotels = searchHotelByLocation(hotels, request.query);
-        saveHotelData(found_hotels, getsize(found_hotels));
+        char *foundStr = hotelArrString(found_hotels);
+        long str_size = strlen(foundStr) + 1; // Include null terminator
 
-        FILE *file = fopen("sendHotels.csv", "rb");
-        if (file == NULL)
-        {
-            perror("Failed to open the file");
-            close(clientSocket);
-            return NULL;
-        }
-
-        fseek(file, 0, SEEK_END);
-        long file_size = ftell(file);
-        fseek(file, 0, SEEK_SET);
-        char *buffer = (char *)malloc(file_size);
-        fread(buffer, file_size, 1, file);
-        fclose(file);
-
-        int bytes_sent = send(clientSocket, &file_size, sizeof(long), 0);
+        int bytes_sent = send(clientSocket, &str_size, sizeof(long), 0);
         if (bytes_sent == -1)
         {
-            perror("Failed to send file size");
+            perror("Fail/* code */ed to send string size");
             close(clientSocket);
             return NULL;
         }
 
-        bytes_sent = send(clientSocket, buffer, file_size, 0);
+        bytes_sent = send(clientSocket, foundStr, str_size, 0);
         if (bytes_sent == -1)
         {
-            perror("Failed to send file");
+            perror("Failed to send string");
             close(clientSocket);
             return NULL;
         }
-
-        free(buffer);
         // printHotelData(found_hotels);
         break;
     case 2:
-        // Handle case 2: perform action for choice 2
+        found_hotels = RoomsByBedCount(hotels, atoi(request.query));
+        foundStr = hotelArrString(found_hotels);
+        str_size = strlen(foundStr) + 1; // Include null terminator
+
+        bytes_sent = send(clientSocket, &str_size, sizeof(long), 0);
+        if (bytes_sent == -1)
+        {
+            perror("Fail/* code */ed to send string size");
+            close(clientSocket);
+            return NULL;
+        }
+
+        bytes_sent = send(clientSocket, foundStr, str_size, 0);
+        if (bytes_sent == -1)
+        {
+            perror("Failed to send string");
+            close(clientSocket);
+            return NULL;
+        }
         break;
     case 3:
         // Handle case 3: perform action for choice 3
@@ -90,7 +91,6 @@ int main(int argc, char **argv)
 {
     // Get the hotel data from the function
     hotels = getHotelData("hotels.csv");
-    printf("Size of array:%d",getsize(hotels));
     int serverSocket, clientSocket;
     struct sockaddr_in serverAddr, clientAddr;
     pthread_t threadId;

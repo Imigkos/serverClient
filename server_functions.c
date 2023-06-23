@@ -181,21 +181,69 @@ Hotel **searchHotelByLocation(Hotel **hotels, const char *search_location)
     return found_hotels;
 }
 
-Room *searchRoomByBedNumber(Hotel *hotels, int hotel_count, int search_bed_number)
+Hotel **RoomsByBedCount(Hotel **hotels, int target_beds)
 {
+    Hotel **found_hotels = NULL;
+    int hotel_count = getsize(hotels);
+
+    // Allocate memory for the new array of hotels
+    Hotel **new_hotels = malloc(hotel_count * sizeof(Hotel *));
+    int new_hotel_index = 0;
+
+    // Create the new hotels with valid rooms
     for (int i = 0; i < hotel_count; i++)
     {
-        Hotel *current_hotel = &hotels[i];
-        for (int j = 0; j < current_hotel->room_count; j++)
+        Hotel *hotel = hotels[i];
+        int room_count = hotel->room_count;
+        Room **rooms = hotel->rooms;
+
+        // Create a new hotel with valid rooms
+        Hotel *new_hotel = malloc(sizeof(Hotel));
+        new_hotel->name = hotel->name;
+        new_hotel->location = hotel->location;
+        new_hotel->description = hotel->description;
+        new_hotel->room_count = 0;
+        new_hotel->rooms = malloc(room_count * sizeof(Room *));
+
+        for (int j = 0; j < room_count; j++)
         {
-            Room *current_room = current_hotel->rooms[j];
-            if (current_room->beds == search_bed_number)
+            Room *room = rooms[j];
+
+            if (room->beds == target_beds)
             {
-                return current_room;
+                // Create a new room with the same values
+                Room *new_room = malloc(sizeof(Room));
+                new_room->price = room->price;
+                new_room->description = room->description;
+                new_room->booked_dates_count = room->booked_dates_count;
+                new_room->booked_dates = room->booked_dates;
+                new_room->beds = room->beds;
+                new_room->number = room->number;
+
+                // Add the new room to the new hotel
+                new_hotel->rooms[new_hotel->room_count] = new_room;
+                new_hotel->room_count++;
+            }
+            else
+            {
+                free(room->description);
+                free(room);
             }
         }
+
+        if (new_hotel->room_count > 0)
+        {
+            // Add the new hotel to the new array
+            new_hotels[new_hotel_index] = new_hotel;
+            new_hotel_index++;
+        }
+        else
+        {
+            free(new_hotel);
+        }
     }
-    return NULL; // If no matching room is found
+    new_hotels[new_hotel_index] = NULL;
+    return new_hotels;
 }
 
 void saveHotelData(Hotel **hotels, int hotel_count)
@@ -254,4 +302,88 @@ void saveHotelData(Hotel **hotels, int hotel_count)
     fclose(file);
 
     printf("Hotel data saved successfully.\n");
+}
+
+char *roomToString(Room *room)
+{
+    // Calculate the length of the string representation
+    int totalLength = snprintf(NULL, 0, "Price: %d\nDescription: %s\nBooked Dates: ", room->price, room->description);
+
+    for (int i = 0; i < room->booked_dates_count; i++)
+    {
+        totalLength += snprintf(NULL, 0, "%s, ", room->booked_dates[i]);
+    }
+
+    totalLength += snprintf(NULL, 0, "\nBeds: %d\nNumber: %d\n", room->beds, room->number);
+
+    // Create the string buffer
+    char *str = (char *)malloc((totalLength + 1) * sizeof(char));
+
+    // Copy the room information into the string buffer
+    snprintf(str, totalLength + 1, "Price: %d\nDescription: %s\nBooked Dates: ", room->price, room->description);
+
+    for (int i = 0; i < room->booked_dates_count; i++)
+    {
+        snprintf(str + strlen(str), totalLength + 1 - strlen(str), "%s, ", room->booked_dates[i]);
+    }
+
+    snprintf(str + strlen(str), totalLength + 1 - strlen(str), "\nBeds: %d\nNumber: %d\n", room->beds, room->number);
+
+    return str;
+}
+
+char *hotelToString(Hotel *hotel)
+{
+    // Calculate the length of the string representation
+    int totalLength = snprintf(NULL, 0, "Hotel Name: %s\nLocation: %s\nDescription: %s\nRoom Count: %d\n\n",
+                               hotel->name, hotel->location, hotel->description, hotel->room_count);
+
+    for (int i = 0; i < hotel->room_count; i++)
+    {
+        totalLength += snprintf(NULL, 0, "%s\n", roomToString(hotel->rooms[i]));
+    }
+
+    // Create the string buffer
+    char *str = (char *)malloc((totalLength + 1) * sizeof(char));
+
+    // Copy the hotel and room information into the string buffer
+    snprintf(str, totalLength + 1, "Hotel Name: %s\nLocation: %s\nDescription: %s\nRoom Count: %d\n\n",
+             hotel->name, hotel->location, hotel->description, hotel->room_count);
+
+    for (int i = 0; i < hotel->room_count; i++)
+    {
+        snprintf(str + strlen(str), totalLength + 1 - strlen(str), "%s\n", roomToString(hotel->rooms[i]));
+    }
+
+    int length = strlen(str);
+    str[length] = '\0';
+    return str;
+}
+
+char **hotelArrString(Hotel **hotels)
+{
+    int size = getsize(hotels);
+
+    // Allocate memory for the array of strings
+    char **finalStrings = malloc(size * sizeof(char *));
+
+    for (int i = 0; i < size; i++)
+    {
+        // Convert each hotel to a string
+        char *hotelString = hotelToString(hotels[i]);
+
+        // Allocate memory for the current hotel string
+        finalStrings[i] = malloc(strlen(hotelString) + 15);
+
+        // Copy the hotel string into the current array entry
+        strcpy(finalStrings[i], hotelString);
+
+        // Add separator to the current array entry
+        strcat(finalStrings[i], "===============\n");
+
+        // Free memory allocated by hotelString
+        free(hotelString);
+    }
+
+    return finalStrings;
 }
