@@ -6,6 +6,67 @@
 #include <unistd.h>
 #include "server_functions.c"
 
+char *convertDate(const char *date)
+{
+    char converted_date[11];
+    sprintf(converted_date, "%.2s%.2s-%.2s%.2s", date + 3, date, date + 9, date + 6);
+
+    // Allocate memory for the converted date string
+    char *result = (char *)malloc((strlen(converted_date) + 1) * sizeof(char));
+    strcpy(result, converted_date);
+
+    return result;
+}
+
+bool isValidDate(const char *date)
+{
+    // Check the length of the date string
+    if (strlen(date) != 11)
+        return false;
+
+    // Extract day and month values
+    int day1 = atoi(date);
+    int month1 = atoi(date + 3);
+    int day2 = atoi(date + 6);
+    int month2 = atoi(date + 9);
+
+    // Perform validity checks
+    if (day1 < 1 || day1 > 31 || month1 < 1 || month1 > 12 ||
+        day2 < 1 || day2 > 31 || month2 < 1 || month2 > 12)
+        return false;
+
+    return true;
+}
+
+char *receiveString(int clientSocket)
+{
+    // Receive the size of the current string
+    long str_size;
+    int bytes_received = recv(clientSocket, &str_size, sizeof(long), 0);
+    if (bytes_received == -1)
+    {
+        perror("Failed to receive string size");
+        close(clientSocket);
+        return NULL;
+    }
+
+    // Create a buffer to receive the string
+    char *rbuffer = malloc(str_size);
+
+    // Receive the string itself
+    bytes_received = recv(clientSocket, rbuffer, str_size, 0);
+    if (bytes_received == -1)
+    {
+        perror("Failed to receive string");
+        close(clientSocket);
+        return NULL;
+    }
+
+    // Null-terminate the received string
+    rbuffer[str_size - 1] = '\0';
+    return rbuffer;
+}
+
 void sendMenuChoice(int clientSocket, char *buffer, int choice)
 {
     // Create the search request
@@ -46,40 +107,16 @@ int doRequest(int choice, int clientSocket)
     // Create an array of strings to store the received strings
     char **receivedStrings = malloc(str_count * sizeof(char *));
 
-    if (str_count == 0){
+    if (str_count == 0)
+    {
         return 0;
-    } 
+    }
 
     // Receive each string in the array
     for (int i = 0; i < str_count; i++)
     {
-        // Receive the size of the current string
-        long str_size;
-        bytes_received = recv(clientSocket, &str_size, sizeof(long), 0);
-        if (bytes_received == -1)
-        {
-            perror("Failed to receive string size");
-            close(clientSocket);
-            return 0;
-        }
-
-        // Create a buffer to receive the string
-        char *rbuffer = malloc(str_size);
-
-        // Receive the string itself
-        bytes_received = recv(clientSocket, rbuffer, str_size, 0);
-        if (bytes_received == -1)
-        {
-            perror("Failed to receive string");
-            close(clientSocket);
-            return 0;
-        }
-
-        // Null-terminate the received string
-        rbuffer[str_size - 1] = '\0';
-
         // Store the received string in the array
-        receivedStrings[i] = rbuffer;
+        receivedStrings[i] = receiveString(clientSocket);
     }
 
     // Print the received strings
@@ -112,7 +149,7 @@ int main(int argc, char **argv)
 
     // Set server address structure
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(8050); // Same port number used by the server
+    serverAddr.sin_port = htons(8060); // Same port number used by the server
     if (inet_pton(AF_INET, "127.0.0.1", &(serverAddr.sin_addr)) <= 0)
     {
         perror("Invalid address/Address not supported");
@@ -145,6 +182,7 @@ int main(int argc, char **argv)
             if (doRequest(choice, clientSocket))
             {
                 int roomID = 0;
+                char book_date[10];
                 printf("\nEnter the id of the room you want to book. Otherwise enter 0 to go back to the menu: ");
                 scanf("%d", &roomID);
                 getchar();
@@ -154,9 +192,20 @@ int main(int argc, char **argv)
                     continue;
                 }
 
-                printf("Enter the Date you want to book");
+                printf("Enter the Date you want to book: ");
+                scanf("%s", book_date);
+                getchar();
+                if (isValidDate(book_date) == 0)
+                {
+                    printf("\nPlease enter a valid date. Going back to start menu\n");
+                    continue;
+                }
+                char *book_date_conv = convertDate(book_date);
+                sendMenuChoice(clientSocket, book_date_conv, roomID);
+                char *book_answer = receiveString(clientSocket);
+                printf("%s", book_answer);
             }
-            else //incase something goes wrong while doing request
+            else // incase something goes wrong while doing request
             {
                 continue;
             }
@@ -175,3 +224,4 @@ int main(int argc, char **argv)
     // Close the client socket
     close(clientSocket);
 }
+

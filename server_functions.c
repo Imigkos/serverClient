@@ -468,10 +468,10 @@ char *roomToString(Room *room)
         char m1[3] = {mmdd[0], mmdd[1], '\0'};
         char m2[3] = {mmdd[5], mmdd[6], '\0'};
 
-        snprintf(str + strlen(str), totalLength + 1 - strlen(str), "%s/%s-%s/%s, ", d1,m1,d2,m2);
+        snprintf(str + strlen(str), totalLength + 1 - strlen(str), "%s/%s-%s/%s,", d1, m1, d2, m2);
     }
 
-    snprintf(str + strlen(str), totalLength + 1 - strlen(str), "\nBeds: %d\nNumber: %d\n", room->beds, room->number);
+    snprintf(str + strlen(str), totalLength + 4 - strlen(str), "\nBeds: %d\nNumber: %d\n", room->beds, room->number);
 
     return str;
 }
@@ -530,4 +530,40 @@ char **hotelArrString(Hotel **hotels)
     }
 
     return finalStrings;
+}
+
+bool check_availability(char *new_date_start, char *new_date_end, char **booked_dates, int booked_dates_count)
+{
+    for (int i = 0; i < booked_dates_count; i++)
+    {
+        char booked_date[10];
+        strcpy(booked_date, booked_dates[i]);
+        char *start_date = strtok(booked_date, "-");
+        char *end_date = strtok(NULL, "-");
+
+        // Extract day and month from start and end dates
+        int booked_start_day = atoi(start_date);
+        int booked_start_month = atoi(start_date + 2);
+        int booked_end_day = atoi(end_date);
+        int booked_end_month = atoi(end_date + 2);
+
+        // Extract day and month from new date range
+        int new_start_day = atoi(new_date_start);
+        int new_start_month = atoi(new_date_start + 2);
+        int new_end_day = atoi(new_date_end);
+        int new_end_month = atoi(new_date_end + 2);
+
+        // Compare the dates
+        if ((booked_end_month > new_start_month) ||
+            (booked_end_month == new_start_month && booked_end_day >= new_start_day))
+        {
+            if ((booked_start_month < new_end_month) ||
+                (booked_start_month == new_end_month && booked_start_day <= new_end_day))
+            {
+                return false;
+            }
+        }
+    }
+
+    return true;
 }

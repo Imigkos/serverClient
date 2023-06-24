@@ -1,4 +1,5 @@
 #define BUFFER_SIZE 1024
+#include <stdbool.h>
 
 // hotel room structure
 typedef struct
@@ -40,3 +41,5 @@ void freeStringArray(char **strings, int size);
 void receiveRequest(int clientSocket, char **found_hotels);
 char *roomToString(Room *room);
 char **hotelArrString(Hotel **hotels);
+bool sendString(char *str, int clientSocket);
+bool bookDate(int id, char *buffer);
