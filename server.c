@@ -15,15 +15,17 @@ Hotel **hotels;
 int getStringArraySize(char **stringArray)
 {
     int size = 0;
-    while (stringArray[size] != NULL)
+    if (stringArray != NULL)
     {
-        size++;
+        while (stringArray[size] != NULL)
+        {
+            size++;
+        }
     }
     return size;
 }
 
-
-void receiveRequest(int clientSocket,char **found_hotels)
+void receiveRequest(int clientSocket, char **found_hotels)
 {
     int num_strings = getStringArraySize(found_hotels);
     long str_size = num_strings; // Number of strings
@@ -81,38 +83,41 @@ void *clientHandler(void *arg)
 {
     int clientSocket = *(int *)arg;
     SearchRequest request;
-
-    // Receive client request
-    ssize_t bytesRead = recv(clientSocket, &request, sizeof(SearchRequest), 0);
-    if (bytesRead < 0)
+    int menu = 1;
+    while (menu)
     {
-        perror("Error receiving client request");
-        close(clientSocket);
-        return NULL;
-    }
+        // Receive client request
+        ssize_t bytesRead = recv(clientSocket, &request, sizeof(SearchRequest), 0);
+        if (bytesRead < 0)
+        {
+            perror("Error receiving client request");
+            close(clientSocket);
+            return NULL;
+        }
 
-    // Process client requests based on the received input
-    switch (request.choice)
-    {
-    case 1:
-        char **found_hotels;
-        found_hotels = searchHotelByLocation(hotels, request.query);
-        receiveRequest(clientSocket, found_hotels);
-        break;
-    case 2:
-        found_hotels = RoomsByBedCount(hotels, atoi(request.query));
-        receiveRequest(clientSocket, found_hotels);
-        break;
-    case 3:
-        found_hotels = RoomsByPrice(hotels,request.query);
-        receiveRequest(clientSocket,found_hotels);
-        break;
-    case 4:
-        // Handle case 4: perform action for choice 4
-        break;
-    default:
-        // Handle invalid choice: send an error response or perform other actions
-        break;
+        // Process client requests based on the received input
+        switch (request.choice)
+        {
+        case 1:
+            char **found_hotels;
+            found_hotels = searchHotelByLocation(hotels, request.query);
+            receiveRequest(clientSocket, found_hotels);
+            break;
+        case 2:
+            found_hotels = RoomsByBedCount(hotels, atoi(request.query));
+            receiveRequest(clientSocket, found_hotels);
+            break;
+        case 3:
+            found_hotels = RoomsByPrice(hotels, request.query);
+            receiveRequest(clientSocket, found_hotels);
+            break;
+        case 4:
+            menu = 0;
+            break;
+        default:
+            // Handle invalid choice: send an error response or perform other actions
+            break;
+        }
     }
     close(clientSocket);
     return NULL;
@@ -137,7 +142,7 @@ int main(int argc, char **argv)
     // Set server address structure
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = INADDR_ANY;
-    serverAddr.sin_port = htons(8090); // You can choose a different port number if needed
+    serverAddr.sin_port = htons(8050); // You can choose a different port number if needed
 
     // Bind server socket to the specified address and port
     if (bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)

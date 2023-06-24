@@ -6,16 +6,8 @@
 #include <unistd.h>
 #include "server_functions.c"
 
-void doRequest(int choice, int clientSocket)
+void sendMenuChoice(int clientSocket, char *buffer, int choice)
 {
-    char buffer[BUFFER_SIZE];
-
-    // Prompt the user to enter the location query
-    printf("Location example:'athens'\nBed Number example:'2'\nPrice Number example:'150-250'\n");
-    printf("Enter search query: ");
-    fgets(buffer, BUFFER_SIZE, stdin);
-    buffer[strcspn(buffer, "\n")] = '\0';
-
     // Create the search request
     SearchRequest request;
     request.choice = choice;
@@ -27,6 +19,19 @@ void doRequest(int choice, int clientSocket)
         perror("Error sending search request");
         exit(EXIT_FAILURE);
     }
+}
+
+int doRequest(int choice, int clientSocket)
+{
+    char buffer[BUFFER_SIZE];
+
+    // Prompt the user to enter the location query
+    printf("Location example:'athens'\nBed Number example:'2'\nPrice Number example:'150-250'\n");
+    printf("Enter search query:");
+    fgets(buffer, BUFFER_SIZE, stdin);
+    buffer[strcspn(buffer, "\n")] = '\0';
+
+    sendMenuChoice(clientSocket, buffer, choice);
 
     // Receive the number of strings
     long str_count;
@@ -35,11 +40,15 @@ void doRequest(int choice, int clientSocket)
     {
         perror("Failed to receive string count");
         close(clientSocket);
-        return;
+        return 0;
     }
 
     // Create an array of strings to store the received strings
     char **receivedStrings = malloc(str_count * sizeof(char *));
+
+    if (str_count == 0){
+        return 0;
+    } 
 
     // Receive each string in the array
     for (int i = 0; i < str_count; i++)
@@ -51,7 +60,7 @@ void doRequest(int choice, int clientSocket)
         {
             perror("Failed to receive string size");
             close(clientSocket);
-            return;
+            return 0;
         }
 
         // Create a buffer to receive the string
@@ -63,7 +72,7 @@ void doRequest(int choice, int clientSocket)
         {
             perror("Failed to receive string");
             close(clientSocket);
-            return;
+            return 0;
         }
 
         // Null-terminate the received string
@@ -76,7 +85,7 @@ void doRequest(int choice, int clientSocket)
     // Print the received strings
     for (int i = 0; i < str_count; i++)
     {
-        printf("%s\n",receivedStrings[i]);
+        printf("%s\n", receivedStrings[i]);
     }
 
     // Free the memory allocated for the received strings
@@ -85,6 +94,7 @@ void doRequest(int choice, int clientSocket)
         free(receivedStrings[i]);
     }
     free(receivedStrings);
+    return 1;
 }
 
 int main(int argc, char **argv)
@@ -102,7 +112,7 @@ int main(int argc, char **argv)
 
     // Set server address structure
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(8090); // Same port number used by the server
+    serverAddr.sin_port = htons(8050); // Same port number used by the server
     if (inet_pton(AF_INET, "127.0.0.1", &(serverAddr.sin_addr)) <= 0)
     {
         perror("Invalid address/Address not supported");
@@ -124,32 +134,39 @@ int main(int argc, char **argv)
         /* code */
 
         // Display the menu and get user's choice
-        printf("What do you want to search based on?\n");
+        printf("\nWhat do you want to search based on?\n");
         printf("1) Location\n2)Number of Beds\n3)Price Range\n4)Exit");
         printf("\nEnter your choice: ");
         scanf("%d", &choice);
         getchar(); // Clear the newline character from the input buffer
 
-        if (choice == 1)
+        if (choice <= 3 && choice >= 1)
         {
-            doRequest(choice, clientSocket);
-        }
+            if (doRequest(choice, clientSocket))
+            {
+                int roomID = 0;
+                printf("\nEnter the id of the room you want to book. Otherwise enter 0 to go back to the menu: ");
+                scanf("%d", &roomID);
+                getchar();
 
-        else if (choice == 2)
-        {
-            doRequest(choice, clientSocket);
+                if (roomID == 0)
+                {
+                    continue;
+                }
+
+                printf("Enter the Date you want to book");
+            }
+            else //incase something goes wrong while doing request
+            {
+                continue;
+            }
         }
-        else if (choice == 3)
-        {
-            doRequest(choice,clientSocket);
-        }
-        
         else if (choice == 4)
         {
             menu = 0;
+            sendMenuChoice(clientSocket, "", choice);
             break;
         }
-        
         else
         {
             printf("Invalid choice\n");

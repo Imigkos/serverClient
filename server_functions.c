@@ -177,8 +177,13 @@ char **searchHotelByLocation(Hotel **hotels, const char *search_location)
             count++;
         }
     }
-    char  **str  =  hotelArrString(found_hotels);
-    return str;
+
+    if (count > 0)
+    {
+        char **str = hotelArrString(found_hotels);
+        return str;
+    }
+    return NULL;
 }
 
 char **RoomsByBedCount(Hotel **hotels, int target_beds)
@@ -271,16 +276,20 @@ char **RoomsByBedCount(Hotel **hotels, int target_beds)
     // Set the terminating NULL
     roomStrings[roomIndex] = NULL;
 
-    return roomStrings;
+    if (roomCount > 0)
+    {
+        return roomStrings;
+    }
+    return NULL;
 }
 
 char **RoomsByPrice(Hotel **hotels, char *price_str)
 {
     char **roomStrings = NULL;
     int roomCount = 0;
-    int minPrice,maxPrice;
+    int minPrice, maxPrice;
 
-    //parsing price range
+    // parsing price range
     sscanf(price_str, "%d-%d", &minPrice, &maxPrice);
 
     // Count the number of rooms with the target number of beds
@@ -353,7 +362,7 @@ char **RoomsByPrice(Hotel **hotels, char *price_str)
         for (int j = 0; j < hotelRoomCount; j++)
         {
             Room *room = hotel->rooms[j];
-            if (room->price<= maxPrice && room->price >= minPrice)
+            if (room->price <= maxPrice && room->price >= minPrice)
             {
                 char *roomString = roomToString(room);
                 strcat(hotelString, roomString);
@@ -368,9 +377,12 @@ char **RoomsByPrice(Hotel **hotels, char *price_str)
     // Set the terminating NULL
     roomStrings[roomIndex] = NULL;
 
-    return roomStrings;
+    if (roomCount > 0)
+    {
+        return roomStrings;
+    }
+    return NULL;
 }
-
 
 void saveHotelData(Hotel **hotels, int hotel_count)
 {
@@ -450,7 +462,13 @@ char *roomToString(Room *room)
 
     for (int i = 0; i < room->booked_dates_count; i++)
     {
-        snprintf(str + strlen(str), totalLength + 1 - strlen(str), "%s, ", room->booked_dates[i]);
+        const char *mmdd = room->booked_dates[i];
+        char d1[3] = {mmdd[2], mmdd[3], '\0'};
+        char d2[3] = {mmdd[7], mmdd[8], '\0'};
+        char m1[3] = {mmdd[0], mmdd[1], '\0'};
+        char m2[3] = {mmdd[5], mmdd[6], '\0'};
+
+        snprintf(str + strlen(str), totalLength + 1 - strlen(str), "%s/%s-%s/%s, ", d1,m1,d2,m2);
     }
 
     snprintf(str + strlen(str), totalLength + 1 - strlen(str), "\nBeds: %d\nNumber: %d\n", room->beds, room->number);
