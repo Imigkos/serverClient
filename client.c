@@ -5,6 +5,35 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include "server_functions.c"
+#include <signal.h>
+
+int clientSocket;
+
+void sendMenuChoice(char *buffer, int choice)
+{
+    // Create the search request
+    SearchRequest request;
+    request.choice = choice;
+    strcpy(request.query, buffer);
+
+    // Send the search request to the server
+    if (send(clientSocket, &request, sizeof(SearchRequest), 0) < 0)
+    {
+        perror("Error sending search request");
+        exit(EXIT_FAILURE);
+    }
+}
+
+
+void handleSignal(int signal) {
+    if (signal == SIGINT) {
+        printf("Ctrl+C pressed. Exiting gracefully...\n");
+        sendMenuChoice("",4);//send message to server to close
+        sleep(3);
+        // close(clientSocket);
+        exit(1);
+    }
+}
 
 char *convertDate(const char *date)
 {
@@ -38,7 +67,7 @@ bool isValidDate(const char *date)
     return true;
 }
 
-char *receiveString(int clientSocket)
+char *receiveString()
 {
     // Receive the size of the current string
     long str_size;
@@ -67,22 +96,8 @@ char *receiveString(int clientSocket)
     return rbuffer;
 }
 
-void sendMenuChoice(int clientSocket, char *buffer, int choice)
-{
-    // Create the search request
-    SearchRequest request;
-    request.choice = choice;
-    strcpy(request.query, buffer);
 
-    // Send the search request to the server
-    if (send(clientSocket, &request, sizeof(SearchRequest), 0) < 0)
-    {
-        perror("Error sending search request");
-        exit(EXIT_FAILURE);
-    }
-}
-
-int doRequest(int choice, int clientSocket)
+int doRequest(int choice)
 {
     char buffer[BUFFER_SIZE];
 
@@ -92,7 +107,7 @@ int doRequest(int choice, int clientSocket)
     fgets(buffer, BUFFER_SIZE, stdin);
     buffer[strcspn(buffer, "\n")] = '\0';
 
-    sendMenuChoice(clientSocket, buffer, choice);
+    sendMenuChoice(buffer, choice);
 
     // Receive the number of strings
     long str_count;
@@ -116,12 +131,13 @@ int doRequest(int choice, int clientSocket)
     for (int i = 0; i < str_count; i++)
     {
         // Store the received string in the array
-        receivedStrings[i] = receiveString(clientSocket);
+        receivedStrings[i] = receiveString();
     }
 
     // Print the received strings
     for (int i = 0; i < str_count; i++)
     {
+        printf("===================\n");
         printf("%s\n", receivedStrings[i]);
     }
 
@@ -134,9 +150,14 @@ int doRequest(int choice, int clientSocket)
     return 1;
 }
 
-int main(int argc, char **argv)
+int main(int argc, char *argv[])
 {
-    int clientSocket;
+    if (argc != 2) {
+        printf("Usage: %s <port>\n", argv[0]);
+        return 1;
+    }
+
+    int port = atoi(argv[1]);
     struct sockaddr_in serverAddr;
 
     // Create client socket
@@ -149,7 +170,7 @@ int main(int argc, char **argv)
 
     // Set server address structure
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(8060); // Same port number used by the server
+    serverAddr.sin_port = htons(port); // Same port number used by the server
     if (inet_pton(AF_INET, "127.0.0.1", &(serverAddr.sin_addr)) <= 0)
     {
         perror("Invalid address/Address not supported");
@@ -166,20 +187,23 @@ int main(int argc, char **argv)
     int choice;
     int menu = 1;
 
+    // Set up the signal handler
+    signal(SIGINT, handleSignal);
+
     while (menu)
     {
         /* code */
 
         // Display the menu and get user's choice
         printf("\nWhat do you want to search based on?\n");
-        printf("1) Location\n2)Number of Beds\n3)Price Range\n4)Exit");
+        printf("1)Location\n2)Number of Beds\n3)Price Range\n4)Exit");
         printf("\nEnter your choice: ");
         scanf("%d", &choice);
         getchar(); // Clear the newline character from the input buffer
 
         if (choice <= 3 && choice >= 1)
         {
-            if (doRequest(choice, clientSocket))
+            if (doRequest(choice))
             {
                 int roomID = 0;
                 char book_date[10];
@@ -201,8 +225,8 @@ int main(int argc, char **argv)
                     continue;
                 }
                 char *book_date_conv = convertDate(book_date);
-                sendMenuChoice(clientSocket, book_date_conv, roomID);
-                char *book_answer = receiveString(clientSocket);
+                sendMenuChoice(book_date_conv, roomID);
+                char *book_answer = receiveString();
                 printf("%s", book_answer);
             }
             else // incase something goes wrong while doing request
@@ -213,7 +237,7 @@ int main(int argc, char **argv)
         else if (choice == 4)
         {
             menu = 0;
-            sendMenuChoice(clientSocket, "", choice);
+            sendMenuChoice("", choice);
             break;
         }
         else
@@ -223,5 +247,6 @@ int main(int argc, char **argv)
     }
     // Close the client socket
     close(clientSocket);
+    exit(1);
 }
 

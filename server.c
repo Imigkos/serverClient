@@ -72,7 +72,7 @@ void *clientHandler(void *arg)
     {
         // Receive client request
         ssize_t bytesRead = recv(clientSocket, &request, sizeof(SearchRequest), 0);
-        if (bytesRead < 0)
+        if (bytesRead <= 0)
         {
             perror("Error receiving client request");
             close(clientSocket);
@@ -97,6 +97,7 @@ void *clientHandler(void *arg)
             break;
         case 4:
             menu = 0;
+            saveHotelData(hotels,getsize(hotels));
             break;
         default:
             if (bookDate(request.choice, request.query) == 1)
@@ -114,8 +115,14 @@ void *clientHandler(void *arg)
     return NULL;
 }
 
-int main(int argc, char **argv)
+int main(int argc, char *argv[])
 {
+    if (argc != 2) {
+        printf("Usage: %s <port>\n", argv[0]);
+        return 1;
+    }
+
+    int port = atoi(argv[1]);
     // Get the hotel data from the function
     hotels = getHotelData("hotels.csv");
     int serverSocket, clientSocket;
@@ -133,7 +140,7 @@ int main(int argc, char **argv)
     // Set server address structure
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = INADDR_ANY;
-    serverAddr.sin_port = htons(8060); // You can choose a different port number if needed
+    serverAddr.sin_port = htons(port); // You can choose a different port number if needed
 
     // Bind server socket to the specified address and port
     if (bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
@@ -162,6 +169,7 @@ int main(int argc, char **argv)
 
     while (1)
     {
+        
         socklen_t clientLen = sizeof(clientAddr);
 
         // Accept client connection
@@ -221,28 +229,17 @@ void splitDateRange(const char *dateRange, char *startDate, char *endDate)
     endDate[4] = '\0';
 }
 
-void appendBookingDate(char **booked_dates, int booked_dates_count, const char *new_date)
+void appendBookingDate(int hind, int rind, char *new_date)
 {
-    // Calculate the new size for the array
-    int new_size = booked_dates_count + 1;
+    // Reallocate memory for the new array
+    char **new_booked_dates = realloc(hotels[hind]->rooms[rind]->booked_dates, (hotels[hind]->rooms[rind]->booked_dates_count + 1) * sizeof(char *));
+    hotels[hind]->rooms[rind]->booked_dates = new_booked_dates;
 
-    // Reallocate memory for the expanded array
-    char **new_booked_dates = (char **)realloc(*booked_dates, new_size * sizeof(char *));
+    // Allocate memory for the new date and copy the value
+    hotels[hind]->rooms[rind]->booked_dates[hotels[hind]->rooms[rind]->booked_dates_count] = malloc(strlen(new_date) + 1);
+    strcpy(hotels[hind]->rooms[rind]->booked_dates[hotels[hind]->rooms[rind]->booked_dates_count], new_date);
 
-    if (new_booked_dates == NULL)
-    {
-        // Handle memory allocation error
-        printf("Memory allocation failed!\n");
-        return;
-    }
-
-    // Allocate memory for the new entry and copy the date string
-    new_booked_dates[new_size - 1] = (char *)malloc((strlen(new_date) + 1) * sizeof(char));
-    strcpy(new_booked_dates[new_size - 1], new_date);
-
-    // Update the booked_dates pointer and count
-    booked_dates = new_booked_dates;
-    booked_dates_count = new_size;
+    hotels[hind]->rooms[rind]->booked_dates_count++;
 }
 
 bool bookDate(int id, char *buffer)
@@ -265,7 +262,7 @@ bool bookDate(int id, char *buffer)
             {
                 if (check_availability(startDate, endDate, room->booked_dates, room->booked_dates_count) == 1)
                 {
-                    appendBookingDate(room->booked_dates,room->booked_dates_count,buffer);
+                    appendBookingDate(i, j, buffer);
                     return true;
                 }
             }

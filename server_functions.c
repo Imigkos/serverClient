@@ -114,12 +114,12 @@ Hotel **getHotelData(char *filename)
     return hotels;
 }
 
-int getsize(Hotel **hotels)
+int getsize(Hotel **fhotels)
 {
     int length = 0;
 
     // Iterate until a NULL pointer is encountered
-    while (hotels[length] != NULL)
+    while (fhotels[length] != NULL)
     {
         length++;
     }
@@ -177,12 +177,14 @@ char **searchHotelByLocation(Hotel **hotels, const char *search_location)
             count++;
         }
     }
-
+    found_hotels[count] = NULL;
     if (count > 0)
     {
         char **str = hotelArrString(found_hotels);
+        free(found_hotels);
         return str;
     }
+    free(found_hotels);
     return NULL;
 }
 
@@ -387,7 +389,7 @@ char **RoomsByPrice(Hotel **hotels, char *price_str)
 void saveHotelData(Hotel **hotels, int hotel_count)
 {
     // Open the file for writing in overwrite mode ("w+")
-    FILE *file = fopen("sendHotels.csv", "w+");
+    FILE *file = fopen("savedHotels.csv", "w+");
     if (file == NULL)
     {
         printf("Failed to open the file for writing.\n");
@@ -445,7 +447,7 @@ void saveHotelData(Hotel **hotels, int hotel_count)
 char *roomToString(Room *room)
 {
     // Calculate the length of the string representation
-    int totalLength = snprintf(NULL, 0, "Price: %d\nDescription: %s\nBooked Dates: ", room->price, room->description);
+    int totalLength = snprintf(NULL, 0, "\nPrice: %d\nDescription: %s\nBooked Dates: ", room->price, room->description);
 
     for (int i = 0; i < room->booked_dates_count; i++)
     {
@@ -458,7 +460,7 @@ char *roomToString(Room *room)
     char *str = (char *)malloc((totalLength + 1) * sizeof(char));
 
     // Copy the room information into the string buffer
-    snprintf(str, totalLength + 1, "Price: %d\nDescription: %s\nBooked Dates: ", room->price, room->description);
+    snprintf(str, totalLength + 1, "\nPrice: %d\nDescription: %s\nBooked Dates: ", room->price, room->description);
 
     for (int i = 0; i < room->booked_dates_count; i++)
     {
@@ -471,7 +473,7 @@ char *roomToString(Room *room)
         snprintf(str + strlen(str), totalLength + 1 - strlen(str), "%s/%s-%s/%s,", d1, m1, d2, m2);
     }
 
-    snprintf(str + strlen(str), totalLength + 4 - strlen(str), "\nBeds: %d\nNumber: %d\n", room->beds, room->number);
+    snprintf(str + strlen(str), totalLength + 4 - strlen(str), "\nBeds: %d\nID: %d\n", room->beds, room->number);
 
     return str;
 }
@@ -504,9 +506,9 @@ char *hotelToString(Hotel *hotel)
     return str;
 }
 
-char **hotelArrString(Hotel **hotels)
+char **hotelArrString(Hotel **found_hotels)
 {
-    int size = getsize(hotels);
+    int size = getsize(found_hotels);
 
     // Allocate memory for the array of strings
     char **finalStrings = malloc(size * sizeof(char *));
@@ -514,7 +516,7 @@ char **hotelArrString(Hotel **hotels)
     for (int i = 0; i < size; i++)
     {
         // Convert each hotel to a string
-        char *hotelString = hotelToString(hotels[i]);
+        char *hotelString = hotelToString(found_hotels[i]);
 
         // Allocate memory for the current hotel string
         finalStrings[i] = malloc(strlen(hotelString) + 15);
@@ -528,7 +530,7 @@ char **hotelArrString(Hotel **hotels)
         // Free memory allocated by hotelString
         free(hotelString);
     }
-
+    finalStrings[size] = NULL;
     return finalStrings;
 }
 
@@ -542,27 +544,21 @@ bool check_availability(char *new_date_start, char *new_date_end, char **booked_
         char *end_date = strtok(NULL, "-");
 
         // Extract day and month from start and end dates
-        int booked_start_day = atoi(start_date);
-        int booked_start_month = atoi(start_date + 2);
-        int booked_end_day = atoi(end_date);
-        int booked_end_month = atoi(end_date + 2);
+        int booked_start = atoi(start_date);
+        int booked_end= atoi(end_date);
 
         // Extract day and month from new date range
-        int new_start_day = atoi(new_date_start);
-        int new_start_month = atoi(new_date_start + 2);
-        int new_end_day = atoi(new_date_end);
-        int new_end_month = atoi(new_date_end + 2);
+        int new_start = atoi(new_date_start);
+        int new_end = atoi(new_date_end);
 
-        // Compare the dates
-        if ((booked_end_month > new_start_month) ||
-            (booked_end_month == new_start_month && booked_end_day >= new_start_day))
+        if (new_start <= booked_end && new_end >= booked_start)
         {
-            if ((booked_start_month < new_end_month) ||
-                (booked_start_month == new_end_month && booked_start_day <= new_end_day))
-            {
-                return false;
-            }
+
+            // free(booked_date_copy); // Free the memory allocated for the copy
+
+            return false;
         }
+        // free(booked_date_copy); // Free the memory allocated for the copy
     }
 
     return true;

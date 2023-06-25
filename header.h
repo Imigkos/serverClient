@@ -29,17 +29,15 @@ typedef struct
 } SearchRequest;
 
 Hotel **getHotelData(char *filename);
-int getsize(Hotel **hotels);
+int getsize(Hotel **fhotels);
 void printRoomData(Room *room);
 void printHotelData(Hotel *hotel);
 char **searchHotelByLocation(Hotel **hotels, const char *search_location);
 Room *searchRoomByBedNumber(Hotel *hotels, int hotel_count, int search_bed_number);
-char *hotelToJson(const Hotel *hotel);
-Hotel *jsonToHotel(const char *json_str);
 void saveHotelData(Hotel **hotels, int hotel_count);
 void freeStringArray(char **strings, int size);
 void receiveRequest(int clientSocket, char **found_hotels);
 char *roomToString(Room *room);
-char **hotelArrString(Hotel **hotels);
+char **hotelArrString(Hotel **foound_hotels);
 bool sendString(char *str, int clientSocket);
 bool bookDate(int id, char *buffer);
