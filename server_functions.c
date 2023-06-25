@@ -1,10 +1,6 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include "header.h"
-#include <json-c/json.h>
-#define MAX_ROOMS 100
-#define MAX_BOOKED_DATES 100
+#include "server.h"
+
+Hotel **hotels;
 
 void remove_newline_character(char *string)
 {
@@ -125,40 +121,6 @@ int getsize(Hotel **fhotels)
     }
 
     return length;
-}
-
-void printRoomData(Room *room)
-{
-    printf("Room Type: %d bed\n", room->beds);
-    printf("Room Number: %d\n", room->number);
-    printf("Price : %d\n", room->price);
-    printf("Booked Dates: ");
-    for (int k = 0; k < room->booked_dates_count; k++)
-    {
-        printf("%s ", room->booked_dates[k]);
-    }
-    printf("\n");
-
-    printf("Room Description: %s\n", room->description);
-
-    printf("\n");
-}
-
-void printHotelData(Hotel *hotel)
-{
-
-    printf("\nHotel Name: %s\n", hotel->name);
-    printf("Location: %s\n", hotel->location);
-    printf("Description: %s\n", hotel->description);
-
-    printf("These rooms are available\n");
-    for (int j = 0; j < hotel->room_count; j++)
-    {
-        printf("%d)", j + 1);
-        Room *room = hotel->rooms[j];
-        printRoomData(room);
-    }
-    printf("=========================================\n");
 }
 
 char **searchHotelByLocation(Hotel **hotels, const char *search_location)
@@ -386,64 +348,6 @@ char **RoomsByPrice(Hotel **hotels, char *price_str)
     return NULL;
 }
 
-void saveHotelData(Hotel **hotels, int hotel_count)
-{
-    // Open the file for writing in overwrite mode ("w+")
-    FILE *file = fopen("savedHotels.csv", "w+");
-    if (file == NULL)
-    {
-        printf("Failed to open the file for writing.\n");
-        return;
-    }
-
-    // Write the hotel data to the file
-    for (int i = 0; i < hotel_count; i++)
-    {
-        const Hotel *hotel = hotels[i];
-
-        // Write hotel information
-        fprintf(file, "%s#%s#%s#", hotel->name, hotel->location, hotel->description);
-
-        // Write room information for the hotel
-        for (int j = 0; j < hotel->room_count; j++)
-        {
-            const Room *room = hotel->rooms[j];
-
-            // Write room details
-            fprintf(file, "%d#%d", room->beds, room->number);
-
-            fprintf(file, "#%d#", room->price);
-
-            // Write booked dates
-            for (int k = 0; k < room->booked_dates_count; k++)
-            {
-                fprintf(file, "%s", room->booked_dates[k]);
-                if (k < room->booked_dates_count - 1)
-                {
-                    fprintf(file, ",");
-                }
-            }
-            fprintf(file, "#");
-
-            // Write room description
-            if (j + 1 == hotel->room_count)
-            {
-                fprintf(file, "%s", room->description);
-            }
-            else
-            {
-                fprintf(file, "%s#", room->description);
-            }
-        }
-        fprintf(file, "\n");
-    }
-
-    // Close the file
-    fclose(file);
-
-    printf("Hotel data saved successfully.\n");
-}
-
 char *roomToString(Room *room)
 {
     // Calculate the length of the string representation
@@ -545,7 +449,7 @@ bool check_availability(char *new_date_start, char *new_date_end, char **booked_
 
         // Extract day and month from start and end dates
         int booked_start = atoi(start_date);
-        int booked_end= atoi(end_date);
+        int booked_end = atoi(end_date);
 
         // Extract day and month from new date range
         int new_start = atoi(new_date_start);
@@ -562,4 +466,129 @@ bool check_availability(char *new_date_start, char *new_date_end, char **booked_
     }
 
     return true;
+}
+
+int getStringArraySize(char **stringArray)
+{
+    int size = 0;
+    if (stringArray != NULL)
+    {
+        while (stringArray[size] != NULL)
+        {
+            size++;
+        }
+    }
+    return size;
+}
+
+// Helper function to free the memory allocated for the string array
+void freeStringArray(char **strings, int size)
+{
+    for (int i = 0; i < size; i++)
+    {
+        free(strings[i]);
+    }
+    free(strings);
+}
+
+void splitDateRange(const char *dateRange, char *startDate, char *endDate)
+{
+    strncpy(startDate, dateRange, 4);
+    startDate[4] = '\0';
+
+    strncpy(endDate, dateRange + 5, 4);
+    endDate[4] = '\0';
+}
+
+void appendBookingDate(int hind, int rind, char *new_date)
+{
+    // Reallocate memory for the new array
+    char **new_booked_dates = realloc(hotels[hind]->rooms[rind]->booked_dates, (hotels[hind]->rooms[rind]->booked_dates_count + 1) * sizeof(char *));
+    hotels[hind]->rooms[rind]->booked_dates = new_booked_dates;
+
+    // Allocate memory for the new date and copy the value
+    hotels[hind]->rooms[rind]->booked_dates[hotels[hind]->rooms[rind]->booked_dates_count] = malloc(strlen(new_date) + 1);
+    strcpy(hotels[hind]->rooms[rind]->booked_dates[hotels[hind]->rooms[rind]->booked_dates_count], new_date);
+
+    hotels[hind]->rooms[rind]->booked_dates_count++;
+}
+
+bool bookDate(int id, char *buffer)
+{
+
+    char startDate[5];
+    char endDate[5];
+
+    splitDateRange(buffer, startDate, endDate);
+
+    int hotel_count = getsize(hotels);
+    for (int i = 0; i < hotel_count; i++)
+    {
+        const Hotel *hotel = hotels[i];
+
+        for (int j = 0; j < hotel->room_count; j++)
+        {
+            const Room *room = hotel->rooms[j];
+            if (room->number == id)
+            {
+                if (check_availability(startDate, endDate, room->booked_dates, room->booked_dates_count) == 1)
+                {
+                    appendBookingDate(i, j, buffer);
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+bool sendString(char *str, int clientSocket)
+{
+    long str_length = strlen(str) + 1; // Include null terminator
+
+    // Send the size of the current string
+    int bytes_sent = send(clientSocket, &str_length, sizeof(long), 0);
+    if (bytes_sent == -1)
+    {
+        perror("Failed to send string size");
+        close(clientSocket);
+        return false;
+    }
+
+    // Send the current string
+    bytes_sent = send(clientSocket, str, str_length, 0);
+    if (bytes_sent == -1)
+    {
+        perror("Failed to send string");
+        close(clientSocket);
+        return false;
+    }
+    return true;
+}
+
+void receiveRequest(int clientSocket, char **found_hotels)
+{
+    int num_strings = getStringArraySize(found_hotels);
+    long str_size = num_strings; // Number of strings
+
+    // Send the number of strings to the client
+    int bytes_sent = send(clientSocket, &str_size, sizeof(long), 0);
+    if (bytes_sent == -1)
+    {
+        perror("Failed to send string count");
+        close(clientSocket);
+        freeStringArray(found_hotels, num_strings); // Free the string array
+        return;
+    }
+
+    // Send each string in the array to the client
+    for (int i = 0; i < num_strings; i++)
+    {
+        if (sendString(found_hotels[i], clientSocket) == 0)
+        {
+            freeStringArray(found_hotels, num_strings);
+            return;
+        }
+    }
+    freeStringArray(found_hotels, num_strings); // Free the string array
 }

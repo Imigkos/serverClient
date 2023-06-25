@@ -1,67 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <pthread.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <unistd.h>
 #include "server_functions.c"
-
-#define MAX_CLIENTS 10
-#define BUFFER_SIZE 1024
-
-Hotel **hotels;
-
-int getStringArraySize(char **stringArray)
-{
-    int size = 0;
-    if (stringArray != NULL)
-    {
-        while (stringArray[size] != NULL)
-        {
-            size++;
-        }
-    }
-    return size;
-}
-
-void receiveRequest(int clientSocket, char **found_hotels)
-{
-    int num_strings = getStringArraySize(found_hotels);
-    long str_size = num_strings; // Number of strings
-
-    // Send the number of strings to the client
-    int bytes_sent = send(clientSocket, &str_size, sizeof(long), 0);
-    if (bytes_sent == -1)
-    {
-        perror("Failed to send string count");
-        close(clientSocket);
-        freeStringArray(found_hotels, num_strings); // Free the string array
-        return;
-    }
-
-    // Send each string in the array to the client
-    for (int i = 0; i < num_strings; i++)
-    {
-        if (sendString(found_hotels[i], clientSocket) == 0)
-        {
-            freeStringArray(found_hotels, num_strings);
-            return;
-        }
-    }
-    freeStringArray(found_hotels, num_strings); // Free the string array
-    printf("1");
-}
-
-// Helper function to free the memory allocated for the string array
-void freeStringArray(char **strings, int size)
-{
-    for (int i = 0; i < size; i++)
-    {
-        free(strings[i]);
-    }
-    free(strings);
-}
 
 void *clientHandler(void *arg)
 {
@@ -97,7 +34,6 @@ void *clientHandler(void *arg)
             break;
         case 4:
             menu = 0;
-            saveHotelData(hotels,getsize(hotels));
             break;
         default:
             if (bookDate(request.choice, request.query) == 1)
@@ -117,7 +53,8 @@ void *clientHandler(void *arg)
 
 int main(int argc, char *argv[])
 {
-    if (argc != 2) {
+    if (argc != 2)
+    {
         printf("Usage: %s <port>\n", argv[0]);
         return 1;
     }
@@ -169,7 +106,7 @@ int main(int argc, char *argv[])
 
     while (1)
     {
-        
+
         socklen_t clientLen = sizeof(clientAddr);
 
         // Accept client connection
@@ -218,79 +155,4 @@ int main(int argc, char *argv[])
     close(serverSocket);
 
     return 0;
-}
-
-void splitDateRange(const char *dateRange, char *startDate, char *endDate)
-{
-    strncpy(startDate, dateRange, 4);
-    startDate[4] = '\0';
-
-    strncpy(endDate, dateRange + 5, 4);
-    endDate[4] = '\0';
-}
-
-void appendBookingDate(int hind, int rind, char *new_date)
-{
-    // Reallocate memory for the new array
-    char **new_booked_dates = realloc(hotels[hind]->rooms[rind]->booked_dates, (hotels[hind]->rooms[rind]->booked_dates_count + 1) * sizeof(char *));
-    hotels[hind]->rooms[rind]->booked_dates = new_booked_dates;
-
-    // Allocate memory for the new date and copy the value
-    hotels[hind]->rooms[rind]->booked_dates[hotels[hind]->rooms[rind]->booked_dates_count] = malloc(strlen(new_date) + 1);
-    strcpy(hotels[hind]->rooms[rind]->booked_dates[hotels[hind]->rooms[rind]->booked_dates_count], new_date);
-
-    hotels[hind]->rooms[rind]->booked_dates_count++;
-}
-
-bool bookDate(int id, char *buffer)
-{
-
-    char startDate[5];
-    char endDate[5];
-
-    splitDateRange(buffer, startDate, endDate);
-
-    int hotel_count = getsize(hotels);
-    for (int i = 0; i < hotel_count; i++)
-    {
-        const Hotel *hotel = hotels[i];
-
-        for (int j = 0; j < hotel->room_count; j++)
-        {
-            const Room *room = hotel->rooms[j];
-            if (room->number == id)
-            {
-                if (check_availability(startDate, endDate, room->booked_dates, room->booked_dates_count) == 1)
-                {
-                    appendBookingDate(i, j, buffer);
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
-}
-
-bool sendString(char *str, int clientSocket)
-{
-    long str_length = strlen(str) + 1; // Include null terminator
-
-    // Send the size of the current string
-    int bytes_sent = send(clientSocket, &str_length, sizeof(long), 0);
-    if (bytes_sent == -1)
-    {
-        perror("Failed to send string size");
-        close(clientSocket);
-        return false;
-    }
-
-    // Send the current string
-    bytes_sent = send(clientSocket, str, str_length, 0);
-    if (bytes_sent == -1)
-    {
-        perror("Failed to send string");
-        close(clientSocket);
-        return false;
-    }
-    return true;
 }
