@@ -15,12 +15,11 @@ void *clientHandler(void *arg)
             close(clientSocket);
             return NULL;
         }
-
+        char **found_hotels;
         // Process client requests based on the received input
         switch (request.choice)
         {
         case 1:
-            char **found_hotels;
             found_hotels = searchHotelByLocation(hotels, request.query);
             receiveRequest(clientSocket, found_hotels);
             break;
@@ -64,8 +63,7 @@ int main(int argc, char *argv[])
     hotels = getHotelData("hotels.csv");
     int serverSocket, clientSocket;
     struct sockaddr_in serverAddr, clientAddr;
-    // pthread_t threadId;
-
+    
     // Create server socket
     serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (serverSocket == -1)

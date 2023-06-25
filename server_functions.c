@@ -1,5 +1,8 @@
 #include "server.h"
 
+// Define a mutex variable
+pthread_mutex_t booking_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 Hotel **hotels;
 
 void remove_newline_character(char *string)
@@ -139,9 +142,10 @@ char **searchHotelByLocation(Hotel **hotels, const char *search_location)
             count++;
         }
     }
-    found_hotels[count] = NULL;
+    
     if (count > 0)
     {
+        found_hotels[count] = NULL;
         char **str = hotelArrString(found_hotels);
         free(found_hotels);
         return str;
@@ -531,9 +535,12 @@ bool bookDate(int id, char *buffer)
             const Room *room = hotel->rooms[j];
             if (room->number == id)
             {
+                // Lock the mutex before entering the critical section
+                pthread_mutex_lock(&booking_mutex);
                 if (check_availability(startDate, endDate, room->booked_dates, room->booked_dates_count) == 1)
                 {
                     appendBookingDate(i, j, buffer);
+                    pthread_mutex_unlock(&booking_mutex);
                     return true;
                 }
             }
