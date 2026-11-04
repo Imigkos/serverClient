@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
             if (doRequest(choice))
             {
                 int roomID = 0;
-                char book_date[10];
+                char book_date[BUFFER_SIZE];
                 printf("\nEnter the id of the room you want to book. Otherwise enter 0 to go back to the menu: ");
                 scanf("%d", &roomID);
                 getchar();
@@ -65,7 +65,10 @@ int main(int argc, char *argv[])
                 }
 
                 printf("Enter the Date you want to book: ");
-                scanf("%s", book_date);
+                if (scanf("%1023s", book_date) != 1)
+                {
+                    break;
+                }
                 getchar();
                 if (isValidDate(book_date) == 0)
                 {
@@ -74,8 +77,13 @@ int main(int argc, char *argv[])
                 }
                 char *book_date_conv = convertDate(book_date);
                 sendMenuChoice(book_date_conv, roomID);
+                free(book_date_conv);
                 char *book_answer = receiveString();
-                printf("%s", book_answer);
+                if (book_answer != NULL)
+                {
+                    printf("%s", book_answer);
+                    free(book_answer);
+                }
             }
             else // incase something goes wrong while doing request
             {
@@ -95,5 +103,5 @@ int main(int argc, char *argv[])
     }
     // Close the client socket
     close(clientSocket);
-    exit(1);
+    return EXIT_SUCCESS;
 }

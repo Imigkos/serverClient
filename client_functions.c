@@ -32,22 +32,28 @@ char *convertDate(const char *date)
 
 bool isValidDate(const char *date)
 {
-    // Check the length of the date string
-    if (strlen(date) != 11)
+    /* No year is supplied, so February 29 is allowed. */
+    static const int month_days[] = {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    if (date == NULL || strlen(date) != 11 ||
+        date[2] != '/' || date[5] != '-' || date[8] != '/')
         return false;
 
-    // Extract day and month values
+    for (size_t i = 0; i < 11; ++i)
+    {
+        if (i == 2 || i == 5 || i == 8)
+            continue;
+        if (date[i] < '0' || date[i] > '9')
+            return false;
+    }
+
     int day1 = atoi(date);
     int month1 = atoi(date + 3);
     int day2 = atoi(date + 6);
     int month2 = atoi(date + 9);
-
-    // Perform validity checks
-    if (day1 < 1 || day1 > 31 || month1 < 1 || month1 > 12 ||
-        day2 < 1 || day2 > 31 || month2 < 1 || month2 > 12)
+    if (month1 < 1 || month1 > 12 || month2 < 1 || month2 > 12)
         return false;
-
-    return true;
+    return day1 >= 1 && day1 <= month_days[month1 - 1] &&
+           day2 >= 1 && day2 <= month_days[month2 - 1];
 }
 
 char *receiveString()
